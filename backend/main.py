@@ -1,15 +1,3 @@
-import torch
-
-# 1. Universal Bypass: Force legacy load behavior to skip all allowlist security checks at once
-_original_load = torch.load
-def _unrestricted_load(*args, **kwargs):
-    kwargs['weights_only'] = False
-    return _original_load(*args, **kwargs)
-torch.load = _unrestricted_load
-
-# 2. Memory Reduction Patch: Restrict thread creation to keep the system well under Render's 512MB RAM ceiling
-torch.set_num_threads(1)
-
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
