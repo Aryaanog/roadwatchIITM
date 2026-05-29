@@ -1,3 +1,12 @@
+import torch
+
+# Allow PyTorch to unpack the custom YOLO network structure safely
+try:
+    from ultralytics.nn.tasks import DetectionModel
+    torch.serialization.add_safe_globals([DetectionModel])
+except ImportError:
+    pass
+
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
