@@ -5,7 +5,9 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import axios from "axios";
 import { ChangeEvent, DragEvent, useEffect, useState, useRef } from "react";
 
-// ✅ FIX: Uses environment variable in production, drops back to localhost for local testing
+
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+// ✅ Uses environment variable in production, drops back to localhost for local testing
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 type Location = { lat: number; lng: number };
@@ -100,9 +102,9 @@ export default function Home() {
 
     try {
       setIsSearching(true);
-      const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+      // ✅ FIX: Using safe continuous token wrapper reference here
       const response = await axios.get(
-        `https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(searchQuery)}&access_token=${token}`
+        `https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(searchQuery)}&access_token=${MAPBOX_TOKEN}`
       );
 
       const feature = response.data?.features?.[0];
@@ -245,7 +247,8 @@ export default function Home() {
       <Map
         ref={mapRef}
         reuseMaps
-        mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+        // ✅ FIX: Pointing explicitly to unified token reference setup at top
+        mapboxAccessToken={MAPBOX_TOKEN}
         initialViewState={{ longitude: 77.209, latitude: 28.6139, zoom: 12 }}
         mapStyle={darkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v12"}
         interactiveLayerIds={["roads-layer"]}
@@ -253,7 +256,7 @@ export default function Home() {
           const feature = e.features?.[0];
           const { lng, lat } = e.lngLat;
 
-          // ✅ FIX: Safe guard calculation blocks for click points to prevent NaN insertion
+          // Safe guard calculation blocks for click points to prevent NaN insertion
           if (isNaN(lng) || isNaN(lat)) return;
 
           if (feature?.layer?.id === "roads-layer") {
@@ -344,13 +347,13 @@ export default function Home() {
           </Source>
         )}
 
-        {/* ✅ FIX: Markers are explicitly bound to verified locations array structure */}
+        {/* Markers are explicitly bound to verified locations array structure */}
         {validComplaints.map((complaint, index) => (
           <Marker key={`marker-${index}`} longitude={complaint.location.lng} latitude={complaint.location.lat}>
             <div
               className="h-3.5 w-3.5 rounded-full border-2 border-white shadow-xl animate-pulse"
               style={{
-                backgroundColor: complaint.severity === "High" ? "#ef4444" : complaint.severity === "Medium" ? "#eab308" : "#22c55e",
+                backgroundColor: complaint.severity === High ? "#ef4444" : complaint.severity === "Medium" ? "#eab308" : "#22c55e",
               }}
             />
           </Marker>
