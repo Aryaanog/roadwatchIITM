@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import shutil, os, json, math, cv2, urllib.parse
@@ -86,7 +86,7 @@ def find_nearest_road(db, lat, lng):
 def get_roads():
     db = SessionLocal()
     try:
-        roads = db.query(Road).all()
+        roads = db.query(Road).limit(1000).all()
         complaints = db.query(Complaint).all()
 
         # Count up active citizen updates per road segment
@@ -149,7 +149,7 @@ def get_complaints():
         db.close()
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...), lat: float = Form(...), lng: float = Form(...)):
+async def upload_file(request: Request, file: UploadFile = File(...), lat: float = Form(...), lng: float = Form(...)):
     timestamp = datetime.now().strftime("%Y%m%dd_%H%M%S")
     filename_clean = f"{timestamp}_{file.filename}"
     file_path = f"{UPLOAD_DIR}/{filename_clean}"
@@ -202,9 +202,11 @@ async def upload_file(file: UploadFile = File(...), lat: float = Form(...), lng:
         encoded_subject = urllib.parse.quote(f"COMMUNITY SAFETY REPORT: Road Issue Spotted at [{road_title}]")
         mail_link = f"https://mail.google.com/mail/?view=cm&fs=1&to={dest_email}&su={encoded_subject}&body={encoded_body}"
 
+        base_url = str(request.base_url).rstrip("/")
+
         return {
             "analysis": {"issue": issue, "severity": severity, "count": len(detections)},
-            "image_url": f"http://127.0.0.1:8000/uploads/{output_name}",
+            "image_url": f"{base_url}/uploads/{output_name}",
             "mail_link": mail_link
         }
     finally:

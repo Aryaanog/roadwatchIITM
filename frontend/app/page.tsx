@@ -353,7 +353,7 @@ export default function Home() {
             <div
               className="h-3.5 w-3.5 rounded-full border-2 border-white shadow-xl animate-pulse"
               style={{
-                backgroundColor: complaint.severity === High ? "#ef4444" : complaint.severity === "Medium" ? "#eab308" : "#22c55e",
+                backgroundColor: complaint.severity === "High" ? "#ef4444" : complaint.severity === "Medium" ? "#eab308" : "#22c55e",
               }}
             />
           </Marker>
