@@ -5,7 +5,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import axios from "axios";
 import { ChangeEvent, DragEvent, useEffect, useState, useRef } from "react";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+// ✅ FIX: Uses environment variable in production, drops back to localhost for local testing
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 type Location = { lat: number; lng: number };
 
@@ -18,7 +19,7 @@ type RoadProperties = {
   contractor?: string;
   budgetSanctioned?: number | string | null;
   budgetSpent?: number | string | null;
-  currencyCode?: string; // Automatically switches between ₹, £, $, etc.
+  currencyCode?: string; 
   budgetSource?: string;
   communityReports?: number;
   authorityName?: string;
@@ -46,11 +47,9 @@ export default function Home() {
   const [viewMode, setViewMode] = useState("normal");
   const [darkMode, setDarkMode] = useState(false);
 
-  // Global Geocoding Exploration States
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
-  // Machine Learning Pipeline States
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
   const [mailLinkUrl, setMailLinkUrl] = useState<string | null>(null);
@@ -61,13 +60,19 @@ export default function Home() {
 
   const fetchComplaints = () => {
     axios.get(`${API_BASE_URL}/complaints`)
-      .then((res) => setComplaints(res.data))
+      .then((res) => {
+        setComplaints(res.data || []);
+        setNetworkAlert(null); // Clear alert on successful fetch
+      })
       .catch(() => setNetworkAlert("Operating in offline fallback mode. Showing locally cached records."));
   };
 
   const fetchRoadNetwork = () => {
     axios.get(`${API_BASE_URL}/roads`)
-      .then((res) => setRoadData(res.data))
+      .then((res) => {
+        setRoadData(res.data);
+        setNetworkAlert(null);
+      })
       .catch(() => setNetworkAlert("Connection low. Utilizing local cache layers."));
   };
 
@@ -76,7 +81,6 @@ export default function Home() {
     fetchComplaints();
   }, []);
 
-  // GLOBAL FUNCTIONALITY: Dynamically switches layout formats based on country origin rules
   const formatMoney = (amount: number | string | null | undefined, currencyCode = "INR") => {
     if (!amount) return "Information not published";
     const numericAmount = Number(amount);
@@ -90,7 +94,6 @@ export default function Home() {
     }).format(numericAmount);
   };
 
-  // GLOBAL SEARCH WORKFLOW: Resolves coordinates for any address worldwide and moves the viewport
   const handleGlobalSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -106,7 +109,6 @@ export default function Home() {
       if (feature) {
         const [lng, lat] = feature.geometry.coordinates;
         
-        // Smoothly pan map frame to target global location match
         mapRef.current?.flyTo({
           center: [lng, lat],
           zoom: 14,
@@ -114,14 +116,13 @@ export default function Home() {
           essential: true
         });
 
-        // Clear localized states to prepare context workspace reset
         setSelectedRoad(null);
         setClickedLocation(null);
         setAnalysisResult(null);
         setProcessedImageUrl(null);
         setMailLinkUrl(null);
       } else {
-        alert("Location location target could not be verified globally.");
+        alert("Location target could not be verified globally.");
       }
     } catch (err) {
       console.error("Geocoding address discovery failed:", err);
@@ -167,10 +168,15 @@ export default function Home() {
     if (file) uploadImage(file);
   };
 
+  // Filter out invalid items safely before converting them to Mapbox data structures
+  const validComplaints = complaints.filter(
+    (c) => c?.location && !isNaN(c.location.lng) && !isNaN(c.location.lat)
+  );
+
   return (
     <div className={`relative h-screen w-screen transition-colors duration-300 font-sans antialiased overflow-hidden ${darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-100 text-slate-900"}`}>
       
-      {/* 🔍 Dynamic Top-Centered Global Search Console */}
+      {/* 🔍 Top Global Search Console */}
       <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md px-4">
         <form onSubmit={handleGlobalSearch} className={`flex items-center gap-2 rounded-2xl border p-1.5 shadow-2xl backdrop-blur-md transition ${
           darkMode ? "border-slate-800 bg-slate-900/90" : "border-white/50 bg-white/85"
@@ -194,14 +200,14 @@ export default function Home() {
         </form>
       </div>
 
-      {/* 🔔 Citizen Connection Alert Banner */}
+      {/* 🔔 Connection Alert Banner */}
       {networkAlert && (
         <div className="absolute top-24 left-1/2 transform -translate-x-1/2 z-50 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 shadow-md border border-amber-400/50">
           <span>⚠️ {networkAlert}</span>
         </div>
       )}
 
-      {/* 🧭 View Toggles & Theme Engager Controls */}
+      {/* 🧭 Control Toggles */}
       <div className="absolute left-6 top-6 z-50 flex items-center gap-3">
         <div className={`flex overflow-hidden rounded-xl border p-1 shadow-xl backdrop-blur-md ${darkMode ? "border-slate-800 bg-slate-900/80" : "border-white/40 bg-white/70"}`}>
           <button
@@ -235,7 +241,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* 🗺️ Map Canvas Module Component Context */}
+      {/* 🗺️ Map Module Canvas */}
       <Map
         ref={mapRef}
         reuseMaps
@@ -246,6 +252,9 @@ export default function Home() {
         onClick={(e) => {
           const feature = e.features?.[0];
           const { lng, lat } = e.lngLat;
+
+          // ✅ FIX: Safe guard calculation blocks for click points to prevent NaN insertion
+          if (isNaN(lng) || isNaN(lat)) return;
 
           if (feature?.layer?.id === "roads-layer") {
             const nextRoad = (feature.properties || {}) as RoadProperties;
@@ -263,13 +272,13 @@ export default function Home() {
           }
         }}
       >
-        {viewMode === "heatmap" && (
+        {viewMode === "heatmap" && validComplaints.length > 0 && (
           <Source
             id="heat"
             type="geojson"
             data={{
               type: "FeatureCollection",
-              features: complaints.map((c) => ({
+              features: validComplaints.map((c) => ({
                 type: "Feature",
                 properties: { intensity: c.severity === "High" ? 3 : c.severity === "Medium" ? 2 : 1 },
                 geometry: { type: "Point", coordinates: [c.location.lng, c.location.lat] },
@@ -297,34 +306,27 @@ export default function Home() {
 
         {roadData && (
           <Source id="roads" type="geojson" data={roadData as never}>
-            {/* Background track layout drop-shadow overlay */}
             <Layer id="roads-shadow" type="line" paint={{ "line-color": "#000", "line-width": 10, "line-opacity": 0.12 }} />
-            
-            {/* Active Render Track Layer with Filters & Thickness Scaling */}
             <Layer
               id="roads-layer"
               type="line"
-              // 🎛️ 1. FILTER EXPRESSION: Filters out minor paths to reduce canvas clutter
               filter={[
                 "match",
                 ["get", "type"],
-                ["Service", "service", "residential", "Residential", "Unclassified", "unclassified", "footway"], false, // Hide these links
-                true // Render everything else
+                ["Service", "service", "residential", "Residential", "Unclassified", "unclassified", "footway"], false,
+                true
               ]}
               paint={{
-                // Color cases tied to active asset evaluation metrics
                 "line-color": [
                   "case",
-                  ["==", ["get", "id"], selectedRoad?.id || -1], "#38bdf8", // Sky blue select highlight
-                  ["==", ["get", "condition"], "Poor"], "#ef4444",        // Danger Red
-                  ["==", ["get", "condition"], "Average"], "#eab308",     // Alert Yellow
-                  "#22c55e",                                              // Operational Green
+                  ["==", ["get", "id"], selectedRoad?.id || -1], "#38bdf8",
+                  ["==", ["get", "condition"], "Poor"], "#ef4444",
+                  ["==", ["get", "condition"], "Average"], "#eab308",
+                  "#22c55e",
                 ],
-                
-                // 📏 2. DYNAMIC THICKNESS EXPRESSION: Scales line-width programmatically by infrastructure level
                 "line-width": [
                   "case",
-                  ["==", ["get", "id"], selectedRoad?.id || -1], 9, // Extra thick emphasis for active focus element
+                  ["==", ["get", "id"], selectedRoad?.id || -1], 9,
                   [
                     "match",
                     ["get", "type"],
@@ -333,7 +335,7 @@ export default function Home() {
                     "NH", 7.5,
                     "Primary", 5.5,
                     "Secondary", 4.0,
-                    2.5 // Default width factor for minor linking routes
+                    2.5
                   ]
                 ],
                 "line-opacity": 0.85
@@ -342,8 +344,9 @@ export default function Home() {
           </Source>
         )}
 
-        {complaints.map((complaint, index) => (
-          <Marker key={index} longitude={complaint.location.lng} latitude={complaint.location.lat}>
+        {/* ✅ FIX: Markers are explicitly bound to verified locations array structure */}
+        {validComplaints.map((complaint, index) => (
+          <Marker key={`marker-${index}`} longitude={complaint.location.lng} latitude={complaint.location.lat}>
             <div
               className="h-3.5 w-3.5 rounded-full border-2 border-white shadow-xl animate-pulse"
               style={{
@@ -354,10 +357,9 @@ export default function Home() {
         ))}
       </Map>
 
-      {/* 🗚 Dedicated Side Dock Architecture Layer Container */}
+      {/* 🗚 Side Panel Info Cards */}
       <div className="absolute left-6 top-24 z-40 flex flex-col gap-4 max-h-[calc(100vh-8rem)] w-[24rem] overflow-y-auto no-scrollbar pointer-events-none">
         
-        {/* Card Panel One: Public Tracking Details Card */}
         {selectedRoad && (
           <div className={`pointer-events-auto w-full rounded-2xl border p-5 shadow-xl backdrop-blur-md transition-all duration-300 ${
             darkMode ? "border-slate-800 bg-slate-900/80 text-white" : "border-white/30 bg-white/75 text-slate-900"
@@ -365,13 +367,13 @@ export default function Home() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? "text-slate-400" : "text-slate-500"}`}>Public Infrastructure Info</p>
-                <h2 className="text-xl font-black tracking-tight mt-0.5">{selectedRoad.name}</h2>
+                <h2 className="text-xl font-black tracking-tight mt-0.5">{selectedRoad.name || "Unnamed Infrastructure Route"}</h2>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-extrabold uppercase shadow-sm ${
                 selectedRoad.condition === "Poor" ? "bg-red-500 text-white" :
                 selectedRoad.condition === "Average" ? "bg-yellow-500 text-slate-900" : "bg-emerald-500 text-white"
               }`}>
-                {selectedRoad.condition} Status
+                {selectedRoad.condition || "Good"} Status
               </span>
             </div>
 
@@ -386,11 +388,11 @@ export default function Home() {
               </div>
               <div>
                 <p className={darkMode ? "text-slate-400" : "text-slate-500"}>Last Relaying Date</p>
-                <p className="font-bold mt-0.5">{selectedRoad.lastRepaired}</p>
+                <p className="font-bold mt-0.5">{selectedRoad.lastRepaired || "Unknown"}</p>
               </div>
               <div>
                 <p className={darkMode ? "text-slate-400" : "text-slate-500"}>Assigned Contractor</p>
-                <p className="font-bold mt-0.5 truncate" title={selectedRoad.contractor || "N/A"}>{selectedRoad.contractor}</p>
+                <p className="font-bold mt-0.5 truncate" title={selectedRoad.contractor || "N/A"}>{selectedRoad.contractor || "Public Works Dept."}</p>
               </div>
               <div>
                 <p className={darkMode ? "text-slate-400" : "text-slate-500"}>Public Budget Sanctioned</p>
@@ -404,13 +406,12 @@ export default function Home() {
 
             <div className={`mt-4 rounded-xl p-3 border text-xs ${darkMode ? "bg-slate-950/40 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
               <p className={`text-[10px] font-bold uppercase tracking-wider ${darkMode ? "text-slate-400" : "text-slate-500"}`}>Responsible Maintenance Authority</p>
-              <p className="font-bold mt-0.5 text-sky-500">{selectedRoad.authorityName}</p>
-              <p className={`text-[10px] mt-1 italic ${darkMode ? "text-slate-500" : "text-slate-400"}`}>Budget Transparency Source: {selectedRoad.budgetSource}</p>
+              <p className="font-bold mt-0.5 text-sky-500">{selectedRoad.authorityName || "Municipal Corporation Administration"}</p>
+              <p className={`text-[10px] mt-1 italic ${darkMode ? "text-slate-500" : "text-slate-400"}`}>Budget Transparency Source: {selectedRoad.budgetSource || "Open Data Audit"}</p>
             </div>
           </div>
         )}
 
-        {/* Panel Container Two: Citizen Action & Report Input Card */}
         {clickedLocation && selectedRoad && (
           <div className={`pointer-events-auto w-full rounded-2xl border p-5 shadow-xl backdrop-blur-md transition-all duration-300 ${
             darkMode ? "border-slate-800 bg-slate-900/80 text-white" : "border-white/30 bg-white/75 text-slate-900"
@@ -443,7 +444,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* AI Image Verification Canvas Render */}
             {processedImageUrl && (
               <div className={`mt-3 overflow-hidden rounded-xl border p-1 ${darkMode ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"}`}>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide px-1 py-0.5">AI Visual Verification Output</p>
@@ -470,7 +470,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Email Routing Interaction CTA */}
             {mailLinkUrl && (
               <a
                 href={mailLinkUrl}
