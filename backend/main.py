@@ -1,10 +1,19 @@
 import torch
 
-# Allow PyTorch to unpack the custom YOLO network structure safely
+# Complete allowlist patch for Ultralytics YOLO weights on modern PyTorch versions
 try:
     from ultralytics.nn.tasks import DetectionModel
-    torch.serialization.add_safe_globals([DetectionModel])
-except ImportError:
+    
+    # Bundle all structural layouts the unpickler needs to trust
+    safe_structures = [
+        DetectionModel,
+        torch.nn.modules.container.Sequential,
+        torch.nn.modules.container.ModuleList,
+        torch.nn.parameter.Parameter
+    ]
+    
+    torch.serialization.add_safe_globals(safe_structures)
+except Exception:
     pass
 
 from fastapi import FastAPI, File, UploadFile, Form
