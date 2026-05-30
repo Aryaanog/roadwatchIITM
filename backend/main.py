@@ -1,3 +1,5 @@
+import base64
+
 from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -166,6 +168,9 @@ async def upload_file(request: Request, file: UploadFile = File(...), lat: float
     output_path = f"{UPLOAD_DIR}/{output_name}"
     cv2.imwrite(output_path, plotted)
 
+    _, buffer_img = cv2.imencode('.jpg', plotted)
+    b64_string = base64.b64encode(buffer_img).decode('utf-8')
+    image_preview_data = f"data:image/jpeg;base64,{b64_string}"
     if len(detections) == 0:
         issue = "No issue detected"
         severity = "Low"
