@@ -10,12 +10,20 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:aryaan@localhost:5432/roadwatch_data"
 )
 
-# 2. Render protocol compatibility handler
+# 2. Production protocol compatibility handler
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# 3. Core Engine Initialization
-engine = create_engine(DATABASE_URL)
+# 3. Core Engine Initialization with Cloud Performance Optimization
+# pool_pre_ping=True automatically tests connections and recycles dead ones (critical for serverless DBs)
+if "localhost" not in DATABASE_URL:
+    engine = create_engine(
+        DATABASE_URL, 
+        pool_pre_ping=True,
+        pool_recycle=300
+    )
+else:
+    engine = create_engine(DATABASE_URL)
 
 # 4. Request lifecycle session management
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

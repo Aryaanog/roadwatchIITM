@@ -86,7 +86,7 @@ def find_nearest_road(db, lat, lng):
 def get_roads():
     db = SessionLocal()
     try:
-        roads = db.query(Road).limit(1000).all()
+        roads = db.query(Road).all()
         complaints = db.query(Complaint).all()
 
         # Count up active citizen updates per road segment
